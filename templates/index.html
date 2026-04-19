@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prevent Pay — Fraud Detection</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+{% if not model_ready %}
+<div class="warning-banner">
+    <strong>Model not loaded</strong>
+    Run <code>python save_model.py</code> to train and save the model, then restart the server.
+</div>
+{% endif %}
+
+<div class="container">
+    <header>
+        <h1>Prevent Pay</h1>
+        <p>Fraud Detection — Enter transaction details to get a risk prediction.</p>
+    </header>
+
+    <form id="fraud-form" autocomplete="off">
+
+        <div class="form-section">
+            <div class="section-title">Transaction Info</div>
+            <div class="form-grid">
+                <div class="field full-width">
+                    <label for="cc_num">Credit Card Number</label>
+                    <input type="text" id="cc_num" name="cc_num"
+                           placeholder="e.g. 4503101193493052864"
+                           pattern="\d{1,19}" title="Up to 19 digits"
+                           required {% if not model_ready %}disabled{% endif %}>
+                </div>
+                <div class="field">
+                    <label for="amt">Transaction Amount ($)</label>
+                    <input type="number" id="amt" name="amt"
+                           min="0.01" step="0.01" placeholder="e.g. 107.23"
+                           required {% if not model_ready %}disabled{% endif %}>
+                </div>
+                <div class="field">
+                    <label for="trans_datetime">Transaction Date &amp; Time</label>
+                    <input type="datetime-local" id="trans_datetime" name="trans_datetime"
+                           required {% if not model_ready %}disabled{% endif %}>
+                </div>
+                <div class="field">
+                    <label for="category">Category</label>
+                    <select id="category" name="category"
+                            required {% if not model_ready %}disabled{% endif %}>
+                        <option value="">— Select category —</option>
+                        {% for cat in categories %}
+                        <option value="{{ cat }}">{{ cat.replace('_', ' ').title() }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="state">State</label>
+                    <select id="state" name="state"
+                            required {% if not model_ready %}disabled{% endif %}>
+                        <option value="">— Select state —</option>
+                        {% for s in states %}
+                        <option value="{{ s }}">{{ s }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-section">
+            <div class="section-title">Cardholder Info</div>
+            <div class="form-grid">
+                <div class="field">
+                    <label for="gender">Gender</label>
+                    <select id="gender" name="gender"
+                            required {% if not model_ready %}disabled{% endif %}>
+                        <option value="">— Select —</option>
+                        <option value="M">Male</option>
+                        <option value="F">Female</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="dob">Date of Birth</label>
+                    <input type="date" id="dob" name="dob"
+                           required {% if not model_ready %}disabled{% endif %}>
+                </div>
+                <div class="field">
+                    <label for="city_pop">City Population</label>
+                    <input type="number" id="city_pop" name="city_pop"
+                           min="1" step="1" placeholder="e.g. 3495"
+                           required {% if not model_ready %}disabled{% endif %}>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-section">
+            <div class="section-title">Location</div>
+            <div class="form-grid">
+                <div class="field">
+                    <label for="lat">Cardholder Latitude</label>
+                    <input type="number" id="lat" name="lat"
+                           min="-90" max="90" step="0.0001" placeholder="e.g. 36.0788"
+                           required {% if not model_ready %}disabled{% endif %}>
+                </div>
+                <div class="field">
+                    <label for="long">Cardholder Longitude</label>
+                    <input type="number" id="long" name="long"
+                           min="-180" max="180" step="0.0001" placeholder="e.g. -81.1781"
+                           required {% if not model_ready %}disabled{% endif %}>
+                </div>
+                <div class="field">
+                    <label for="merch_lat">Merchant Latitude</label>
+                    <input type="number" id="merch_lat" name="merch_lat"
+                           min="-90" max="90" step="0.0001" placeholder="e.g. 36.0113"
+                           required {% if not model_ready %}disabled{% endif %}>
+                </div>
+                <div class="field">
+                    <label for="merch_long">Merchant Longitude</label>
+                    <input type="number" id="merch_long" name="merch_long"
+                           min="-180" max="180" step="0.0001" placeholder="e.g. -82.0483"
+                           required {% if not model_ready %}disabled{% endif %}>
+                </div>
+            </div>
+        </div>
+
+        <button type="submit" {% if not model_ready %}disabled{% endif %}>
+            Analyze Transaction
+        </button>
+    </form>
+
+    <div class="result-area" id="result-area"></div>
+</div>
+
+<script>
+    const form = document.getElementById('fraud-form');
+    const resultArea = document.getElementById('result-area');
+
+    form.addEventListener('submit', async function (e) {
+        e.preventDefault();
+
+        resultArea.innerHTML = '<div class="result loading"><div class="result-label">Analyzing...</div></div>';
+
+        const transDatetime = form.trans_datetime.value;
+        const unixTime = Math.floor(new Date(transDatetime).getTime() / 1000);
+
+        const payload = {
+            cc_num:         form.cc_num.value.trim(),
+            amt:            parseFloat(form.amt.value),
+            trans_datetime: transDatetime,
+            dob:            form.dob.value,
+            gender:         form.gender.value,
+            lat:            parseFloat(form.lat.value),
+            long:           parseFloat(form.long.value),
+            city_pop:       parseInt(form.city_pop.value),
+            unix_time:      unixTime,
+            merch_lat:      parseFloat(form.merch_lat.value),
+            merch_long:     parseFloat(form.merch_long.value),
+            category:       form.category.value,
+            state:          form.state.value
+        };
+
+        try {
+            const response = await fetch('/predict', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            const result = await response.json();
+
+            if (result.error) {
+                resultArea.innerHTML = `
+                    <div class="result error">
+                        <div class="result-icon">&#9888;</div>
+                        <div class="result-label">Error</div>
+                        <div class="result-confidence">${escapeHtml(result.error)}</div>
+                    </div>`;
+                return;
+            }
+
+            const isFraud = result.prediction === 1;
+            resultArea.innerHTML = `
+                <div class="result ${isFraud ? 'fraud' : 'legitimate'}">
+                    <div class="result-icon">${isFraud ? '&#x26A0;' : '&#x2713;'}</div>
+                    <div class="result-label">${escapeHtml(result.label)}</div>
+                    <div class="result-confidence">Confidence: ${result.confidence}%</div>
+                </div>`;
+
+        } catch (err) {
+            resultArea.innerHTML = `
+                <div class="result error">
+                    <div class="result-icon">&#9888;</div>
+                    <div class="result-label">Connection Error</div>
+                    <div class="result-confidence">Could not reach the server. Is Flask running?</div>
+                </div>`;
+        }
+    });
+
+    function escapeHtml(str) {
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+</script>
+
+</body>
+</html>
