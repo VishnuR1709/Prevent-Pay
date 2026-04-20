@@ -6,6 +6,14 @@ An AI-powered credit card fraud detection system. Enter transaction details and 
 
 ---
 
+Dataset
+The dataset used in this project is obtained from Kaggle. The 2 datasets I played with to get the actual result of 98.84% is:
+
+https://www.kaggle.com/datasets/mlg-ulb/creditcardfraud 
+⁠https://www.kaggle.com/datasets/kartik2112/fraud-detection 
+
+---
+
 ## Project Structure
 
 ```
